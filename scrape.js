@@ -102,20 +102,48 @@ async function scrapeChapterRange(startChapter, endChapter) {
     return { chapters, failedChapters };
 }
 
+// Function to get available images from the 'img' directory
+function getImageFiles() {
+    const imageFolderPath = path.join(__dirname, 'img');
+    return fs.readdirSync(imageFolderPath).filter(file => {
+        const extname = path.extname(file).toLowerCase();
+        return extname === '.jpg' || extname === '.png' || extname === '.jpeg'; // Only accept image files
+    });
+}
+
+// Function to select a cover image for a specific volume
+async function chooseCoverImageForVolume(volumeNumber) {
+    const imageFiles = getImageFiles();
+    if (imageFiles.length === 0) {
+        console.log("No images found in the 'img' folder.");
+        return null;
+    }
+
+    console.log(`Available cover images for Volume ${volumeNumber}:`);
+    imageFiles.forEach((file, index) => {
+        console.log(`${index + 1}. ${file}`);
+    });
+
+    const choice = await askForNumber("Enter the number of the cover image you want to use: ");
+    if (choice >= 1 && choice <= imageFiles.length) {
+        return path.join(__dirname, 'img', imageFiles[choice - 1]);
+    } else {
+        console.log("Invalid choice. Please select a valid number.");
+        return chooseCoverImageForVolume(volumeNumber); // Recursively ask for the valid input
+    }
+}
+
 // Function to create EPUB file from scraped chapters
-async function createEpub(chapters, outputFileName, volumeNumber, customTitle, seriesName, authorName) {
-    // Dynamically create the folder name for the series
-    const seriesFolderName = seriesName.replace(/\s+/g, '_') + '_EPUB';  // Replacing spaces with underscores
-    const outputFolder = path.join(__dirname, seriesFolderName);  // Folder path where EPUB will be saved
+async function createEpub(chapters, outputFileName, volumeNumber, customTitle, seriesName, authorName, coverImagePath) {
+    const seriesFolderName = seriesName.replace(/\s+/g, '_') + '_EPUB';
+    const outputFolder = path.join(__dirname, seriesFolderName);
 
     if (!fs.existsSync(outputFolder)) {
-        fs.mkdirSync(outputFolder, { recursive: true }); // Create the folder if it doesn't exist
+        fs.mkdirSync(outputFolder, { recursive: true });
     }
 
     const dynamicTitle = `${seriesName} Volume ${volumeNumber}: ${customTitle}`;
     const outputFilePath = path.join(outputFolder, outputFileName);
-
-    const coverImagePath = path.join(__dirname, 'img', 'Shadowslave.jpg');
 
     const options = {
         title: dynamicTitle,
@@ -159,9 +187,10 @@ const confirmAction = (message) => {
 };
 
 // Function to scrape multiple volumes
+// Function to scrape multiple volumes
 async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName) {
     const volumes = [];
-    const volumeStatus = []; // To track the status of each volume
+    const volumeStatus = [];
 
     for (let volumeNumber = startVolume; volumeNumber <= endVolume; volumeNumber++) {
         const customTitle = await askForString(`Enter the custom title for Volume ${volumeNumber}: `);
@@ -180,33 +209,34 @@ async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorN
             volumeNumber--; // Re-ask for the same volume
         }
 
-        console.log("\n=====================\n"); // Add a break between volumes
-    }
+        console.log("\n=====================\n");
 
-    // Scrape all volumes
-    for (const { volumeNumber, customTitle, startChapter, endChapter } of volumes) {
-        const outputFileName = `shadow_slave_volume_${volumeNumber}`;
-        console.log(`Scraping chapters ${startChapter} to ${endChapter} for Volume ${volumeNumber}...\n`);
+        // Ask for a cover image for the specific volume
+        const coverImagePath = await chooseCoverImageForVolume(volumeNumber);
 
-        const { chapters, failedChapters } = await scrapeChapterRange(startChapter, endChapter);
+        const { volumeNumber: volNum, customTitle: volTitle, startChapter: startCh, endChapter: endCh } = volumes[volumeNumber - startVolume];
+
+        const outputFileName = `shadow_slave_volume_${volNum}`;
+        console.log(`Scraping chapters ${startCh} to ${endCh} for Volume ${volNum}...\n`);
+
+        const { chapters, failedChapters } = await scrapeChapterRange(startCh, endCh);
 
         if (chapters.length > 0) {
-            console.log(`\nFound ${chapters.length} chapters for Volume ${volumeNumber}. Creating EPUB...`);
-            await createEpub(chapters, `${outputFileName}.epub`, volumeNumber, customTitle, seriesName, authorName);
+            console.log(`\nFound ${chapters.length} chapters for Volume ${volNum}. Creating EPUB...`);
+            await createEpub(chapters, `${outputFileName}.epub`, volNum, volTitle, seriesName, authorName, coverImagePath);
         }
 
         if (failedChapters.length === 0) {
-            console.log(`All chapters of Volume ${volumeNumber} successfully scraped.\n`);
-            volumeStatus.push({ volumeNumber, status: "success" });
+            console.log(`All chapters of Volume ${volNum} successfully scraped.\n`);
+            volumeStatus.push({ volumeNumber: volNum, status: "success" });
         } else {
-            console.log(`Unable to scrape the following chapters of Volume ${volumeNumber}: ${failedChapters.join(', ')}\n`);
-            volumeStatus.push({ volumeNumber, status: "failed", failedChapters });
+            console.log(`Unable to scrape the following chapters of Volume ${volNum}: ${failedChapters.join(', ')}\n`);
+            volumeStatus.push({ volumeNumber: volNum, status: "failed", failedChapters });
         }
 
-        console.log("=================================\n"); // Add a break between volumes
+        console.log("=================================\n");
     }
 
-    // Display summary
     console.log("\nSummary of Scraping Results:");
     let allSuccess = true;
     for (const status of volumeStatus) {
@@ -224,6 +254,7 @@ async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorN
 
     return volumeStatus;
 }
+
 
 // Main program starts here
 async function main() {
@@ -246,11 +277,10 @@ async function main() {
         console.log(`Gathering information for volumes ${startVolume} to ${endVolume} of ${seriesName}...\n`);
         const status = await scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName);
 
-        // Ask if the user wants to run the program again
         const runAgain = await confirmAction("Do you want to run the program again?");
         if (runAgain) {
             console.log("\nRestarting the program...\n");
-            await main(); // Call main again to restart
+            await main();
         } else {
             console.log("Exiting the program...");
             rl.close();
