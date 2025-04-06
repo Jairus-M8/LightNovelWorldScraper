@@ -26,4 +26,5 @@ Thumbs.db
 *.epub
 
 # Ignore generated folders (like output directories)
-Shadow_Slave_Volumes_EPUB/
+*EPUB/
+
