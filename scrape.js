@@ -103,32 +103,30 @@ async function scrapeChapterRange(startChapter, endChapter) {
 }
 
 // Function to create EPUB file from scraped chapters
-async function createEpub(chapters, outputFileName, volumeNumber, customTitle) {
-    const content = chapters.map((chapter) => ({
-        title: chapter.title,
-        data: chapter.content
-    }));
+async function createEpub(chapters, outputFileName, volumeNumber, customTitle, seriesName, authorName) {
+    // Dynamically create the folder name for the series
+    const seriesFolderName = seriesName.replace(/\s+/g, '_') + '_EPUB';  // Replacing spaces with underscores
+    const outputFolder = path.join(__dirname, seriesFolderName);  // Folder path where EPUB will be saved
 
-    if (!outputFileName.endsWith('.epub')) {
-        outputFileName += '.epub';
+    if (!fs.existsSync(outputFolder)) {
+        fs.mkdirSync(outputFolder, { recursive: true }); // Create the folder if it doesn't exist
     }
 
-    const outputFilePath = path.join(__dirname, 'Shadow_Slave_Volumes_EPUB', outputFileName);
-    const dynamicTitle = `Shadow Slave Volume ${volumeNumber}: ${customTitle}`;
+    const dynamicTitle = `${seriesName} Volume ${volumeNumber}: ${customTitle}`;
+    const outputFilePath = path.join(outputFolder, outputFileName);
+
     const coverImagePath = path.join(__dirname, 'img', 'Shadowslave.jpg');
 
     const options = {
         title: dynamicTitle,
-        author: "Guiltythree",
-        content: content,
+        author: authorName,
+        content: chapters.map((chapter) => ({
+            title: chapter.title,
+            data: chapter.content
+        })),
         output: outputFilePath,
         cover: coverImagePath,
     };
-
-    const outputFolder = path.dirname(outputFilePath);
-    if (!fs.existsSync(outputFolder)) {
-        fs.mkdirSync(outputFolder, { recursive: true });
-    }
 
     try {
         await new epub(options).promise;
@@ -161,7 +159,7 @@ const confirmAction = (message) => {
 };
 
 // Function to scrape multiple volumes
-async function scrapeMultipleVolumes(startVolume, endVolume) {
+async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName) {
     const volumes = [];
     const volumeStatus = []; // To track the status of each volume
 
@@ -194,7 +192,7 @@ async function scrapeMultipleVolumes(startVolume, endVolume) {
 
         if (chapters.length > 0) {
             console.log(`\nFound ${chapters.length} chapters for Volume ${volumeNumber}. Creating EPUB...`);
-            await createEpub(chapters, `${outputFileName}.epub`, volumeNumber, customTitle);
+            await createEpub(chapters, `${outputFileName}.epub`, volumeNumber, customTitle, seriesName, authorName);
         }
 
         if (failedChapters.length === 0) {
@@ -234,16 +232,19 @@ async function main() {
     console.log("Type 'exit' at any time to exit the program.");
     console.log("=========================================\n");
 
+    const seriesName = await askForString('Enter the series name: ');  // Ask for the series name
+    const authorName = await askForString('Enter the author name: ');  // Ask for the author name
+
     const startVolume = await askForNumber('Enter the starting volume number: ');
     const endVolume = await askForNumber('Enter the ending volume number: ');
 
     const confirmation = await confirmAction(
-        `You entered the following volume range:\nStart Volume: ${startVolume}\nEnd Volume: ${endVolume}\nIs this correct?`
+        `You entered the following volume range:\nStart Volume: ${startVolume}\nEnd Volume: ${endVolume}\nSeries: ${seriesName}\nAuthor: ${authorName}\nIs this correct?`
     );
 
     if (confirmation) {
-        console.log(`Gathering information for volumes ${startVolume} to ${endVolume}...\n`);
-        const status = await scrapeMultipleVolumes(startVolume, endVolume);
+        console.log(`Gathering information for volumes ${startVolume} to ${endVolume} of ${seriesName}...\n`);
+        const status = await scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName);
 
         // Ask if the user wants to run the program again
         const runAgain = await confirmAction("Do you want to run the program again?");
@@ -262,4 +263,4 @@ async function main() {
     }
 }
 
-main(); 
+main();
