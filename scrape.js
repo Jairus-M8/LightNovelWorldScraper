@@ -112,6 +112,38 @@ function getImageFiles() {
 }
 
 // Function to select a cover image for a specific volume
+async function chooseCoverImageForVolumes(startVolume, endVolume) {
+    const imageFiles = getImageFiles();
+    if (imageFiles.length === 0) {
+        console.log("No images found in the 'img' folder.");
+        return null;
+    }
+
+    console.log(`Available cover images:`);
+    imageFiles.forEach((file, index) => {
+        console.log(`${index + 1}. ${file}`);
+    });
+
+    // Ask for the cover image for the first volume
+    const choice = await askForNumber("Enter the number of the cover image you want to use for the first volume: ");
+    if (choice >= 1 && choice <= imageFiles.length) {
+        const chosenImagePath = path.join(__dirname, 'img', imageFiles[choice - 1]);
+
+        // Now, ask if they want to use the same cover image for all other volumes
+        const useSameCover = await confirmAction("Do you want to use the same cover image for all volumes?");
+
+        if (useSameCover) {
+            return { coverImagePath: chosenImagePath, useSameCoverForAll: true };
+        } else {
+            return { coverImagePath: chosenImagePath, useSameCoverForAll: false };
+        }
+    } else {
+        console.log("Invalid choice. Please select a valid number.");
+        return chooseCoverImageForVolumes(startVolume, endVolume); // Recursively ask for valid input
+    }
+}
+
+// Function to select a cover image for a specific volume
 async function chooseCoverImageForVolume(volumeNumber) {
     const imageFiles = getImageFiles();
     if (imageFiles.length === 0) {
@@ -124,14 +156,40 @@ async function chooseCoverImageForVolume(volumeNumber) {
         console.log(`${index + 1}. ${file}`);
     });
 
-    const choice = await askForNumber("Enter the number of the cover image you want to use: ");
+    // Ask for the cover image for this volume
+    const choice = await askForNumber(`Enter the number of the cover image you want to use for Volume ${volumeNumber}: `);
     if (choice >= 1 && choice <= imageFiles.length) {
-        return path.join(__dirname, 'img', imageFiles[choice - 1]);
+        const chosenImagePath = path.join(__dirname, 'img', imageFiles[choice - 1]);
+
+        return chosenImagePath;
     } else {
         console.log("Invalid choice. Please select a valid number.");
-        return chooseCoverImageForVolume(volumeNumber); // Recursively ask for the valid input
+        return chooseCoverImageForVolume(volumeNumber); // Recursively ask for valid input
     }
 }
+
+
+// Function to confirm user input before proceeding
+const confirmAction = (message) => {
+    return new Promise((resolve) => {
+        rl.question(`${message} (y/n): `, (input) => {
+            if (input.toLowerCase() === 'exit') {
+                console.log("Exiting the program...");
+                rl.close();
+                process.exit();
+            }
+
+            if (input.toLowerCase() === 'y') {
+                resolve(true);
+            } else if (input.toLowerCase() === 'n') {
+                resolve(false);
+            } else {
+                console.log("Invalid input. Please type 'y' for yes or 'n' for no.");
+                resolve(confirmAction(message)); // Recurse if invalid input
+            }
+        });
+    });
+};
 
 // Function to create EPUB file from scraped chapters
 async function createEpub(chapters, outputFileName, volumeNumber, customTitle, seriesName, authorName, coverImagePath) {
@@ -164,34 +222,15 @@ async function createEpub(chapters, outputFileName, volumeNumber, customTitle, s
     }
 }
 
-// Function to confirm user input before proceeding
-const confirmAction = (message) => {
-    return new Promise((resolve) => {
-        rl.question(`${message} (y/n): `, (input) => {
-            if (input.toLowerCase() === 'exit') {
-                console.log("Exiting the program...");
-                rl.close();
-                process.exit();
-            }
-
-            if (input.toLowerCase() === 'y') {
-                resolve(true);
-            } else if (input.toLowerCase() === 'n') {
-                resolve(false);
-            } else {
-                console.log("Invalid input. Please type 'y' for yes or 'n' for no.");
-                resolve(confirmAction(message)); // Recurse if invalid input
-            }
-        });
-    });
-};
-
-// Function to scrape multiple volumes
 // Function to scrape multiple volumes
 async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName) {
     const volumes = [];
     const volumeStatus = [];
 
+    // Ask for the first volume's cover image and if the same one should be used for all volumes
+    const { coverImagePath: initialCoverImage, useSameCoverForAll } = await chooseCoverImageForVolumes(startVolume, endVolume);
+
+    // First gather all volume information before scraping
     for (let volumeNumber = startVolume; volumeNumber <= endVolume; volumeNumber++) {
         const customTitle = await askForString(`Enter the custom title for Volume ${volumeNumber}: `);
 
@@ -210,11 +249,17 @@ async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorN
         }
 
         console.log("\n=====================\n");
+    }
 
-        // Ask for a cover image for the specific volume
-        const coverImagePath = await chooseCoverImageForVolume(volumeNumber);
+    // Now scrape the chapters for each volume
+    for (const volume of volumes) {
+        let coverImagePath = initialCoverImage;
 
-        const { volumeNumber: volNum, customTitle: volTitle, startChapter: startCh, endChapter: endCh } = volumes[volumeNumber - startVolume];
+        if (!useSameCoverForAll) {
+            coverImagePath = await chooseCoverImageForVolume(volume.volumeNumber);  // Ask for cover image per volume
+        }
+
+        const { volumeNumber: volNum, customTitle: volTitle, startChapter: startCh, endChapter: endCh } = volume;
 
         const outputFileName = `shadow_slave_volume_${volNum}`;
         console.log(`Scraping chapters ${startCh} to ${endCh} for Volume ${volNum}...\n`);
@@ -254,7 +299,6 @@ async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorN
 
     return volumeStatus;
 }
-
 
 // Main program starts here
 async function main() {
