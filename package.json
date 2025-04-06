@@ -1,0 +1,18 @@
+{
+  "name": "lightnovelworldscraper",
+  "version": "1.0.0",
+  "description": "A Node.js-based web scraper for extracting chapters from lightnovelworld.co and converting them into EPUB format.",
+  "main": "scrape.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.8.4",
+    "cheerio": "^1.0.0",
+    "ejs": "^3.1.10",
+    "epub-gen": "^0.1.0"
+  }
+}
