@@ -53,8 +53,8 @@ const askForString = (question) => {
 };
 
 // Function to fetch and scrape a chapter with retry mechanism
-async function scrapeChapter(chapterNumber, retries = 5) {
-    const url = `https://www.lightnovelworld.co/novel/shadow-slave-1365/chapter-${chapterNumber}`;
+async function scrapeChapter(chapterNumber, seriesSlug, retries = 5) {
+    const url = `https://www.lightnovelworld.co/novel/${seriesSlug}/chapter-${chapterNumber}`;
 
     try {
         console.log(`Starting to scrape Chapter ${chapterNumber}...`);
@@ -77,7 +77,7 @@ async function scrapeChapter(chapterNumber, retries = 5) {
     } catch (error) {
         if (retries > 0) {
             console.log(`Error scraping Chapter ${chapterNumber}. Retrying... Remaining retries: ${retries}`);
-            return await scrapeChapter(chapterNumber, retries - 1);
+            return await scrapeChapter(chapterNumber, seriesSlug, retries - 1);
         } else {
             console.error(`Error scraping Chapter ${chapterNumber}:`, error.message);
             return null;
@@ -86,12 +86,12 @@ async function scrapeChapter(chapterNumber, retries = 5) {
 }
 
 // Function to scrape a range of chapters and return content for the EPUB
-async function scrapeChapterRange(startChapter, endChapter) {
+async function scrapeChapterRange(startChapter, endChapter, seriesSlug) {
     let chapters = [];
     let failedChapters = [];
 
     for (let i = startChapter; i <= endChapter; i++) {
-        const chapterData = await scrapeChapter(i);
+        const chapterData = await scrapeChapter(i, seriesSlug);
         if (chapterData) {
             chapters.push(chapterData);
         } else {
@@ -168,7 +168,6 @@ async function chooseCoverImageForVolume(volumeNumber) {
     }
 }
 
-
 // Function to confirm user input before proceeding
 const confirmAction = (message) => {
     return new Promise((resolve) => {
@@ -223,7 +222,7 @@ async function createEpub(chapters, outputFileName, volumeNumber, customTitle, s
 }
 
 // Function to scrape multiple volumes
-async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName) {
+async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName, seriesSlug) {
     const volumes = [];
     const volumeStatus = [];
 
@@ -261,10 +260,11 @@ async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorN
 
         const { volumeNumber: volNum, customTitle: volTitle, startChapter: startCh, endChapter: endCh } = volume;
 
-        const outputFileName = `shadow_slave_volume_${volNum}`;
+        const outputFileName = `${seriesName.replace(/\s+/g, '_')}_volume_${volNum}.epub`;
+
         console.log(`Scraping chapters ${startCh} to ${endCh} for Volume ${volNum}...\n`);
 
-        const { chapters, failedChapters } = await scrapeChapterRange(startCh, endCh);
+        const { chapters, failedChapters } = await scrapeChapterRange(startCh, endCh, seriesSlug);
 
         if (chapters.length > 0) {
             console.log(`\nFound ${chapters.length} chapters for Volume ${volNum}. Creating EPUB...`);
@@ -307,6 +307,11 @@ async function main() {
     console.log("Type 'exit' at any time to exit the program.");
     console.log("=========================================\n");
 
+    const seriesUrl = await askForString('Enter the URL of the series! It can be any chapter you would like. \n\nExample: (https://www.lightnovelworld.co/novel/{series-name}-{series-id}/chapter-{chapter-id})\nor\n(https://www.lightnovelworld.co/novel/the-beginning-after-the-end-548/chapter-6-16091352)\nor\n(https://www.lightnovelworld.co/novel/lord-of-the-mysteries-275/chapter-1103):\n');
+
+    const urlParts = seriesUrl.split('/');
+    const seriesSlug = urlParts[4];  // Extract the series slug from the URL
+
     const seriesName = await askForString('Enter the series name: ');  // Ask for the series name
     const authorName = await askForString('Enter the author name: ');  // Ask for the author name
 
@@ -319,7 +324,7 @@ async function main() {
 
     if (confirmation) {
         console.log(`Gathering information for volumes ${startVolume} to ${endVolume} of ${seriesName}...\n`);
-        const status = await scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName);
+        const status = await scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName, seriesSlug);
 
         const runAgain = await confirmAction("Do you want to run the program again?");
         if (runAgain) {
