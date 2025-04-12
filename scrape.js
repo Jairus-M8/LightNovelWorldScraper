@@ -114,9 +114,11 @@ function getImageFiles() {
 // Function to select cover image for multiple volumes
 async function chooseCoverImagesForVolumes(startVolume, endVolume) {
     const imageFiles = getImageFiles();
+    const volumeCount = endVolume - startVolume + 1;
+
     if (imageFiles.length === 0) {
         console.log("No images found in the 'img' folder.");
-        return null;
+        return Array(volumeCount).fill(null);
     }
 
     console.log("Available cover images:");
@@ -124,29 +126,52 @@ async function chooseCoverImagesForVolumes(startVolume, endVolume) {
         console.log(`${index + 1}. ${file}`);
     });
 
+    // Ask if they want to use the same image for all volumes
+    const useSameImage = await confirmAction("Use the same cover image for all volumes?");
+
+    if (useSameImage) {
+        const choice = await askForString("Select a cover image for all volumes (enter image number): ");
+        const numberChoice = parseInt(choice);
+
+        if (numberChoice >= 1 && numberChoice <= imageFiles.length) {
+            const chosenImagePath = path.join(__dirname, 'img', imageFiles[numberChoice - 1]);
+            return Array(volumeCount).fill(chosenImagePath);
+        } else {
+            console.log("Invalid choice. Skipping cover images for all volumes.");
+            return Array(volumeCount).fill(null);
+        }
+    }
+
+    // Ask if they want to use no cover image for all volumesn
+    const skipAll = await confirmAction("Skip cover images for all volumes?");
+    if (skipAll) {
+        return Array(volumeCount).fill(null);
+    }
+
+    // Otherwise, prompt for each volume individually
     const coverImages = [];
 
-    // Ask for the cover image for each volume before scraping
     for (let volumeNumber = startVolume; volumeNumber <= endVolume; volumeNumber++) {
-        const choice = await askForString(`Enter the number of the cover image you want to use for Volume ${volumeNumber}, or type 'none' to skip: `);
+        const choice = await askForString(`Select a cover image for Volume ${volumeNumber} (enter image number or 'none' to skip): `);
 
         if (choice.toLowerCase() === 'none') {
             console.log(`Skipping cover image for Volume ${volumeNumber}.`);
-            coverImages.push(null); // No cover image selected for this volume
+            coverImages.push(null);
         } else {
             const numberChoice = parseInt(choice);
             if (numberChoice >= 1 && numberChoice <= imageFiles.length) {
                 const chosenImagePath = path.join(__dirname, 'img', imageFiles[numberChoice - 1]);
-                coverImages.push(chosenImagePath); // Store the chosen image for this volume
+                coverImages.push(chosenImagePath);
             } else {
                 console.log("Invalid choice. Please select a valid number or type 'none' to skip.");
-                volumeNumber--; // Re-ask for the same volume
+                volumeNumber--; // Re-ask for this volume
             }
         }
     }
 
     return coverImages;
 }
+
 
 // Function to select a cover image for a specific volume
 async function chooseCoverImageForVolume(volumeNumber, skipCoverImageForAllVolumes) {
@@ -317,40 +342,47 @@ async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorN
 // Main program starts here
 async function main() {
     console.log("=========================================");
-    console.log("Welcome to the Scraper!");
-    console.log("Type 'exit' at any time to exit the program.");
+    console.log("Welcome to the Light Novel Scraper!");
+    console.log("You can type 'exit' at any time to quit.");
     console.log("=========================================\n");
 
-    const seriesUrl = await askForString('Enter the URL of the series! It can be any chapter you would like. \n\nExample: (https://www.lightnovelworld.co/novel/{series-name}-{series-id}/chapter-{chapter-id})\nor\n(https://www.lightnovelworld.co/novel/the-beginning-after-the-end-548/chapter-6-16091352)\nor\n(https://www.lightnovelworld.co/novel/lord-of-the-mysteries-275/chapter-1103):\n');
+    const seriesUrl = await askForString(
+        "Enter the URL of any chapter in the series.\n\nExample URLs:\n" +
+        "- https://www.lightnovelworld.co/novel/{series-name}-{series-id}/chapter-{chapter-id}\n" +
+        "- https://www.lightnovelworld.co/novel/the-beginning-after-the-end-548/chapter-6-16091352\n" +
+        "- https://www.lightnovelworld.co/novel/lord-of-the-mysteries-275/chapter-1103\n\nURL: "
+    );
 
     const urlParts = seriesUrl.split('/');
-    const seriesSlug = urlParts[4];  // Extract the series slug from the URL
+    const seriesSlug = urlParts[4];  // Extract the series slug
 
-    const seriesName = await askForString('Enter the series name: ');  // Ask for the series name
-    const authorName = await askForString('Enter the author name: ');  // Ask for the author name
+    const seriesName = await askForString("Series title: ");
+    const authorName = await askForString("Author's name: ");
 
-    const startVolume = await askForNumber('Enter the starting volume number: ');
-    const endVolume = await askForNumber('Enter the ending volume number: ');
+    const startVolume = await askForNumber("Starting volume number: ");
+    const endVolume = await askForNumber("Ending volume number: ");
+
 
     const confirmation = await confirmAction(
-        `You entered the following volume range:\nStart Volume: ${startVolume}\nEnd Volume: ${endVolume}\nSeries: ${seriesName}\nAuthor: ${authorName}\nIs this correct?`
+        `\nPlease confirm the following details:\n` +
+        `Series: ${seriesName}\nAuthor: ${authorName}\nVolume Range: ${startVolume} to ${endVolume}\nIs this correct?`
     );
 
     if (confirmation) {
-        console.log(`Gathering information for volumes ${startVolume} to ${endVolume} of ${seriesName}...\n`);
+        console.log(`\nPreparing to scrape volumes ${startVolume} to ${endVolume} from "${seriesName}"...\n`);
         const status = await scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorName, seriesSlug);
 
-        const runAgain = await confirmAction("Do you want to run the program again?");
+        const runAgain = await confirmAction("Would you like to scrape another series?");
         if (runAgain) {
-            console.log("\nRestarting the program...\n");
+            console.log("\nRestarting...\n");
             await main();
         } else {
-            console.log("Exiting the program...");
+            console.log("Thank you for using the scraper. Goodbye!");
             rl.close();
             process.exit();
         }
     } else {
-        console.log("Exiting the program. Please run again with the correct inputs.");
+        console.log("Operation canceled. Please restart with the correct information.");
         rl.close();
         process.exit();
     }
