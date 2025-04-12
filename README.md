@@ -1,7 +1,3 @@
-Certainly! Here's the updated README with the section added for pasting a valid URL, along with some other refinements:
-
----
-
 # Light Novel World Scraper
 
 A Node.js-based web scraper for extracting chapters from **lightnovelworld.co** and converting them into **EPUB** format.
@@ -74,8 +70,9 @@ The program will prompt you for the following information:
     - `https://www.lightnovelworld.co/novel/lord-of-the-mysteries-275/chapter-1103`
 
 2. **Volume Information**:
+    - Series title
+    - Author
     - The volume number (e.g., Volume 1, Volume 2).
-    - The custom title for the volume.
 
 3. **Chapter Range**:
     - The start and end chapter numbers for the volume.
