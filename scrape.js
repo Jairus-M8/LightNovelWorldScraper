@@ -111,40 +111,50 @@ function getImageFiles() {
     });
 }
 
-// Function to select a cover image for a specific volume
-async function chooseCoverImageForVolumes(startVolume, endVolume) {
+// Function to select cover image for multiple volumes
+async function chooseCoverImagesForVolumes(startVolume, endVolume) {
     const imageFiles = getImageFiles();
     if (imageFiles.length === 0) {
         console.log("No images found in the 'img' folder.");
         return null;
     }
 
-    console.log(`Available cover images:`);
+    console.log("Available cover images:");
     imageFiles.forEach((file, index) => {
         console.log(`${index + 1}. ${file}`);
     });
 
-    // Ask for the cover image for the first volume
-    const choice = await askForNumber("Enter the number of the cover image you want to use for the first volume: ");
-    if (choice >= 1 && choice <= imageFiles.length) {
-        const chosenImagePath = path.join(__dirname, 'img', imageFiles[choice - 1]);
+    const coverImages = [];
 
-        // Now, ask if they want to use the same cover image for all other volumes
-        const useSameCover = await confirmAction("Do you want to use the same cover image for all volumes?");
+    // Ask for the cover image for each volume before scraping
+    for (let volumeNumber = startVolume; volumeNumber <= endVolume; volumeNumber++) {
+        const choice = await askForString(`Enter the number of the cover image you want to use for Volume ${volumeNumber}, or type 'none' to skip: `);
 
-        if (useSameCover) {
-            return { coverImagePath: chosenImagePath, useSameCoverForAll: true };
+        if (choice.toLowerCase() === 'none') {
+            console.log(`Skipping cover image for Volume ${volumeNumber}.`);
+            coverImages.push(null); // No cover image selected for this volume
         } else {
-            return { coverImagePath: chosenImagePath, useSameCoverForAll: false };
+            const numberChoice = parseInt(choice);
+            if (numberChoice >= 1 && numberChoice <= imageFiles.length) {
+                const chosenImagePath = path.join(__dirname, 'img', imageFiles[numberChoice - 1]);
+                coverImages.push(chosenImagePath); // Store the chosen image for this volume
+            } else {
+                console.log("Invalid choice. Please select a valid number or type 'none' to skip.");
+                volumeNumber--; // Re-ask for the same volume
+            }
         }
-    } else {
-        console.log("Invalid choice. Please select a valid number.");
-        return chooseCoverImageForVolumes(startVolume, endVolume); // Recursively ask for valid input
     }
+
+    return coverImages;
 }
 
 // Function to select a cover image for a specific volume
-async function chooseCoverImageForVolume(volumeNumber) {
+async function chooseCoverImageForVolume(volumeNumber, skipCoverImageForAllVolumes) {
+    if (skipCoverImageForAllVolumes) {
+        console.log(`Skipping cover image for Volume ${volumeNumber}.`);
+        return null; // No cover image selected for this volume
+    }
+
     const imageFiles = getImageFiles();
     if (imageFiles.length === 0) {
         console.log("No images found in the 'img' folder.");
@@ -156,17 +166,24 @@ async function chooseCoverImageForVolume(volumeNumber) {
         console.log(`${index + 1}. ${file}`);
     });
 
-    // Ask for the cover image for this volume
-    const choice = await askForNumber(`Enter the number of the cover image you want to use for Volume ${volumeNumber}: `);
-    if (choice >= 1 && choice <= imageFiles.length) {
-        const chosenImagePath = path.join(__dirname, 'img', imageFiles[choice - 1]);
+    // Ask for the cover image for this volume or allow to skip by typing 'none'
+    const choice = await askForString(`Enter the number of the cover image you want to use for Volume ${volumeNumber}, or type 'none' to skip: `);
 
+    if (choice.toLowerCase() === 'none') {
+        console.log(`Skipping cover image for Volume ${volumeNumber}.`);
+        return null; // No cover image selected for this volume
+    }
+
+    const numberChoice = parseInt(choice);
+    if (numberChoice >= 1 && numberChoice <= imageFiles.length) {
+        const chosenImagePath = path.join(__dirname, 'img', imageFiles[numberChoice - 1]);
         return chosenImagePath;
     } else {
-        console.log("Invalid choice. Please select a valid number.");
-        return chooseCoverImageForVolume(volumeNumber); // Recursively ask for valid input
+        console.log("Invalid choice. Please select a valid number or type 'none' to skip.");
+        return chooseCoverImageForVolume(volumeNumber, skipCoverImageForAllVolumes); // Recursively ask for valid input
     }
 }
+
 
 // Function to confirm user input before proceeding
 const confirmAction = (message) => {
@@ -226,8 +243,8 @@ async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorN
     const volumes = [];
     const volumeStatus = [];
 
-    // Ask for the first volume's cover image and if the same one should be used for all volumes
-    const { coverImagePath: initialCoverImage, useSameCoverForAll } = await chooseCoverImageForVolumes(startVolume, endVolume);
+    // Ask for the cover image for each volume before scraping
+    const coverImages = await chooseCoverImagesForVolumes(startVolume, endVolume);
 
     // First gather all volume information before scraping
     for (let volumeNumber = startVolume; volumeNumber <= endVolume; volumeNumber++) {
@@ -251,12 +268,9 @@ async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorN
     }
 
     // Now scrape the chapters for each volume
-    for (const volume of volumes) {
-        let coverImagePath = initialCoverImage;
-
-        if (!useSameCoverForAll) {
-            coverImagePath = await chooseCoverImageForVolume(volume.volumeNumber);  // Ask for cover image per volume
-        }
+    for (let i = 0; i < volumes.length; i++) {
+        const volume = volumes[i];
+        const coverImagePath = coverImages[i]; // Get the cover image for this volume
 
         const { volumeNumber: volNum, customTitle: volTitle, startChapter: startCh, endChapter: endCh } = volume;
 
