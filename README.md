@@ -114,7 +114,6 @@ The generated EPUB files will be saved in a folder named based on the series nam
   package.json
   README.md
 ```
-
 ## Contributing
 
 Contributions are welcome! Feel free to fork the repository, make changes, and create pull requests. Here are a few things you can help with:
@@ -122,3 +121,15 @@ Contributions are welcome! Feel free to fork the repository, make changes, and c
 - Improving the scraper logic (handling edge cases).
 - Adding more features, such as scraping other websites.
 - Writing tests and documentation.
+
+## 📚 Libraries Used
+
+This project utilizes the following open-source libraries and core Node.js modules:
+
+- [`axios`](https://www.npmjs.com/package/axios) – For making HTTP requests to fetch web page content.
+- [`cheerio`](https://www.npmjs.com/package/cheerio) – For parsing and traversing HTML content using a jQuery-like syntax.
+- [`epub-gen`](https://www.npmjs.com/package/epub-gen) – For generating EPUB files from scraped content.
+- [`fs`](https://nodejs.org/api/fs.html) – Node.js file system module for reading and writing files.
+- [`path`](https://nodejs.org/api/path.html) – Node.js utility for handling file and directory paths.
+- [`readline`](https://nodejs.org/api/readline.html) – Node.js module for reading user input from the command line.
+- [`process`](https://nodejs.org/api/process.html) – Provides information and control over the current Node.js process.
