@@ -338,15 +338,71 @@ async function scrapeMultipleVolumes(startVolume, endVolume, seriesName, authorN
 
     return volumeStatus;
 }
+// Function to validate the URL format using regex
+const validateUrlFormat = (url) => {
+    const regex = /^(https?:\/\/)(www\.)?lightnovelworld\.co\/novel\/[a-z0-9-]+-\d+\/chapter-\d+/i;
+    return regex.test(url);
+};
 
-// Main program starts here
+// Function to check if the URL is valid by making an HTTP request
+const checkUrlValidity = async (url) => {
+    try {
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            },
+            timeout: 10000,
+        });
+        // If the status is 2xx (success)
+        if (response.status >= 200 && response.status < 300) {
+            return true;
+        } else {
+            return false;
+        }
+    } catch (error) {
+        // If error occurs (e.g., 404, 500, or other issues)
+        console.error(`Error accessing URL: ${url}. Error: ${error.message}`);
+        return false;
+    }
+};
+
+// Function to ask for a valid URL with checks
+const askForValidUrl = async (question) => {
+    let url = await askForString(question);
+
+    // Check if 'exit' is entered
+    if (url.toLowerCase() === 'exit') {
+        console.log("Exiting the program...");
+        rl.close();
+        process.exit();
+    }
+
+    // Validate the URL format
+    if (!validateUrlFormat(url)) {
+        console.log("Invalid URL format. Please make sure the URL matches the expected pattern.");
+        return askForValidUrl(question); // Recursively ask for a valid URL
+    }
+
+    // Check if the URL is accessible
+    const isValid = await checkUrlValidity(url);
+    if (isValid) {
+        console.log("The URL is valid and accessible.");
+        return url; // Return the valid URL
+    } else {
+        console.log("The URL is not accessible. Please check the URL or try again.");
+        return askForValidUrl(question); // Recursively ask for a valid URL
+    }
+};
+
+// Main program
 async function main() {
     console.log("=========================================");
     console.log("Welcome to the Light Novel Scraper!");
     console.log("You can type 'exit' at any time to quit.");
     console.log("=========================================\n");
 
-    const seriesUrl = await askForString(
+    // Ask for a valid URL
+    const seriesUrl = await askForValidUrl(
         "Enter the URL of any chapter in the series.\n\nExample URLs:\n" +
         "- https://www.lightnovelworld.co/novel/{series-name}-{series-id}/chapter-{chapter-id}\n" +
         "- https://www.lightnovelworld.co/novel/the-beginning-after-the-end-548/chapter-6-16091352\n" +
@@ -361,7 +417,6 @@ async function main() {
 
     const startVolume = await askForNumber("Starting volume number: ");
     const endVolume = await askForNumber("Ending volume number: ");
-
 
     const confirmation = await confirmAction(
         `\nPlease confirm the following details:\n` +
@@ -389,3 +444,4 @@ async function main() {
 }
 
 main();
+
