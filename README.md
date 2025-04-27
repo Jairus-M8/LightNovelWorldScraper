@@ -1,9 +1,9 @@
 # Light Novel World Scraper
 
 A Node.js-based web scraper for extracting chapters from **lightnovelworld.co** and converting them into **EPUB** format.
-
-###*Disclaimer: This is purely for educational purposes only.*
-
+---
+*Disclaimer: This is purely for educational purposes only.*
+---
 ## Description
 
 **Light Novel World Scraper** is a tool designed to scrape chapters from the **Light Novel World** website (lightnovelworld.co) and generate a well-structured **EPUB** file for offline reading. The scraper allows you to fetch a range of chapters from any light novel, customize volume titles, choose cover images, and format everything into a neatly packaged EPUB file.
