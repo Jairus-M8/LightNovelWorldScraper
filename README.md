@@ -1,5 +1,7 @@
 # Light Novel World Scraper
-
+---
+*Update: R.I.P LightNovelWorld *
+---
 A Node.js-based web scraper for extracting chapters from **lightnovelworld.co** and converting them into **EPUB** format.
 ---
 *Disclaimer: This is purely for educational purposes only.*
